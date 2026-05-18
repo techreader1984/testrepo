@@ -1,116 +1,112 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>CSP Security Test - Static Page</title>
+    <title>CSP Security Test</title>
     <style>
         body { font-family: sans-serif; padding: 20px; }
         .box { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; border-radius: 4px; }
         .success { color: green; font-weight: bold; }
         .failure { color: red; font-weight: bold; }
         pre { background: #f4f4f4; padding: 10px; overflow-x: auto; }
+        .ports-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
     </style>
 </head>
 <body>
-    <h1>CSP Security Verification - Static Test Page</h1>
-    <p>This page can be hosted on GitHub Pages or locally to test Chromium's injected CSP guardrails.</p>
-
+    <h1>CSP Security Verification (Static)</h1>
     <div class="box">
         <h3>Observed CSP Headers</h3>
         <pre id="csp-display">Fetching headers...</pre>
     </div>
-
-    <div class="box">
-        <h3>Fetch Localhost:1337 (Expected: ALLOWED)</h3>
-        <button onclick="runFetch(1337)">Test Port 1337</button>
-        <p id="result-1337">Not started</p>
+    <h2>Localhost Service Reachability</h2>
+    <div class="ports-grid">
+        <div class="box">
+            <h3>Port 1337 (Pdftron/RWC)</h3>
+            <p>Expected: <b class="success">ALLOWED</b></p>
+            <button onclick="runFetch(1337)">Test Fetch</button>
+            <button onclick="runIframe(1337)">Test Iframe</button>
+            <p id="result-1337">Not started</p>
+            <p id="result-iframe-1337">Not started</p>
+        </div>
+        <div class="box">
+            <h3>Port 9092 (Prometheus)</h3>
+            <p>Expected: <b class="failure">BLOCKED</b></p>
+            <button onclick="runFetch(9092)">Test Fetch</button>
+            <p id="result-9092">Not started</p>
+        </div>
+        <div class="box">
+            <h3>Port 50051 (EML gRPC)</h3>
+            <p>Expected: <b class="failure">BLOCKED</b></p>
+            <button onclick="runFetch(50051)">Test Fetch</button>
+            <p id="result-50051">Not started</p>
+        </div>
+        <div class="box">
+            <h3>Port 8080 (PAC Server)</h3>
+            <p>Expected: <b class="failure">BLOCKED</b></p>
+            <button onclick="runFetch(8080)">Test Fetch</button>
+            <p id="result-8080">Not started</p>
+        </div>
+        <div class="box">
+            <h3>Port 5678 (LocalProxy)</h3>
+            <p>Expected: <b class="failure">BLOCKED</b></p>
+            <button onclick="runFetch(5678)">Test Fetch</button>
+            <p id="result-5678">Not started</p>
+        </div>
+        <div class="box">
+            <h3>Port 3389 (xrdp)</h3>
+            <p>Expected: <b class="failure">BLOCKED</b></p>
+            <button onclick="runFetch(3389)">Test Fetch</button>
+            <p id="result-3389">Not started</p>
+        </div>
     </div>
-
-    <div class="box">
-        <h3>Fetch Localhost:50051 (Expected: BLOCKED)</h3>
-        <button onclick="runFetch(50051)">Test Port 50051</button>
-        <p id="result-50051">Not started</p>
-    </div>
-
-    <div class="box">
-        <h3>Iframe Localhost:1337 (Expected: ALLOWED)</h3>
-        <button onclick="runIframe(1337)">Test Iframe 1337</button>
-        <div id="iframe-container"></div>
-        <p id="result-iframe-1337">Not started</p>
-    </div>
-
+    <div id="iframe-container" style="display:none;"></div>
     <script>
         async function getCSP() {
             try {
                 const resp = await fetch(window.location.href);
                 const csp = resp.headers.get('Content-Security-Policy');
-                document.getElementById('csp-display').textContent = csp || 'No Server-Side CSP Header Found (Only injected guardrails will apply)';
+                document.getElementById('csp-display').textContent = csp || 'No CSP Header Found';
             } catch (e) {
                 document.getElementById('csp-display').textContent = 'Error reading headers: ' + e.message;
             }
         }
-
         async function runFetch(port) {
-            const display = document.getElementById(`result-${port}`);
+            const display = document.getElementById('result-' + port);
             display.textContent = 'Testing...';
             display.className = '';
-
             try {
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 1000);
-
-                await fetch(`http://localhost:${port}/ping`, {
-                    signal: controller.signal,
-                    mode: 'no-cors'
-                });
-
-                display.textContent = 'SUCCESS (Request reached network)';
+                setTimeout(() => controller.abort(), 1000);
+                await fetch('http://localhost:' + port + '/ping', { signal: controller.signal, mode: 'no-cors' });
+                display.textContent = 'SUCCESS (Reached network)';
                 display.className = 'success';
-                return 'SUCCESS';
             } catch (e) {
-                display.textContent = `FAILED: ${e.name} - ${e.message}`;
+                display.textContent = 'FAILED: ' + e.message;
                 display.className = 'failure';
-                return e.message;
             }
         }
-
         async function runIframe(port) {
             const container = document.getElementById('iframe-container');
-            const display = document.getElementById(`result-iframe-${port}`);
+            const display = document.getElementById('result-iframe-' + port);
             display.textContent = 'Testing Iframe...';
             display.className = '';
-
             return new Promise((resolve) => {
                 const iframe = document.createElement('iframe');
-                iframe.src = `http://localhost:${port}/ping`;
-                iframe.style.width = '100px';
-                iframe.style.height = '50px';
-
-                iframe.onload = () => {
-                    display.textContent = 'Iframe LOADED (Allowed by CSP)';
-                    display.className = 'success';
-                    resolve('LOADED');
-                };
-
-                iframe.onerror = () => {
-                    display.textContent = 'Iframe ERROR';
-                    display.className = 'failure';
-                    resolve('ERROR');
-                };
-
+                iframe.src = 'http://localhost:' + port + '/ping';
+                iframe.onload = () => { display.textContent = 'Iframe LOADED'; display.className = 'success'; resolve(); };
+                iframe.onerror = () => { display.textContent = 'Iframe ERROR'; display.className = 'failure'; resolve(); };
                 container.innerHTML = '';
                 container.appendChild(iframe);
-
-                setTimeout(() => {
-                    if (display.textContent === 'Testing Iframe...') {
-                         display.textContent = 'Iframe TIMEOUT (Possibly blocked)';
-                         resolve('TIMEOUT');
-                    }
-                }, 2000);
+                setTimeout(() => { if (display.textContent === 'Testing Iframe...') { display.textContent = 'Iframe TIMEOUT'; resolve(); } }, 2000);
             });
         }
-
-        // Initialize
         getCSP();
+        if (new URLSearchParams(window.location.search).get('autorun') === 'true') {
+            window.addEventListener('load', async () => {
+                for (const p of [1337, 9092, 50051, 8080, 5678, 3389]) await runFetch(p);
+                await runIframe(1337);
+                const d = document.createElement('div'); d.id = 'e2e-finished'; d.textContent = 'DONE'; document.body.appendChild(d);
+            });
+        }
     </script>
 </body>
 </html>
