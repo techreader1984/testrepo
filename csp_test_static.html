@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>CSP Security Test</title>
+    <title>CSP Security Test (Static)</title>
     <style>
         body { font-family: sans-serif; padding: 20px; }
         .box { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; border-radius: 4px; }
@@ -100,13 +100,11 @@
             });
         }
         getCSP();
-        if (new URLSearchParams(window.location.search).get('autorun') === 'true') {
-            window.addEventListener('load', async () => {
-                for (const p of [1337, 9092, 50051, 8080, 5678, 3389]) await runFetch(p);
-                await runIframe(1337);
-                const d = document.createElement('div'); d.id = 'e2e-finished'; d.textContent = 'DONE'; document.body.appendChild(d);
-            });
-        }
+        window.addEventListener('load', async () => {
+            for (const p of [1337, 9092, 50051, 8080, 5678, 3389]) await runFetch(p);
+            await runIframe(1337);
+            const d = document.createElement('div'); d.id = 'e2e-finished'; d.textContent = 'DONE'; document.body.appendChild(d);
+        });
     </script>
 </body>
 </html>
