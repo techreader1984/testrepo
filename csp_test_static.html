@@ -22,39 +22,39 @@
         <div class="box">
             <h3>Port 1337 (Pdftron/RWC)</h3>
             <p>Expected: <b class="success">ALLOWED</b></p>
-            <button onclick="runFetch(1337)">Test Fetch</button>
-            <button onclick="runIframe(1337)">Test Iframe</button>
+            <button onclick="runFetch(1337, '/ping')">Test Fetch</button>
+            <button onclick="runIframe(1337, '/ping')">Test Iframe</button>
             <p id="result-1337">Not started</p>
             <p id="result-iframe-1337">Not started</p>
         </div>
         <div class="box">
             <h3>Port 9092 (Prometheus)</h3>
             <p>Expected: <b class="failure">BLOCKED</b></p>
-            <button onclick="runFetch(9092)">Test Fetch</button>
+            <button onclick="runFetch(9092, '/metrics')">Test Fetch (/metrics)</button>
             <p id="result-9092">Not started</p>
         </div>
         <div class="box">
             <h3>Port 50051 (EML gRPC)</h3>
             <p>Expected: <b class="failure">BLOCKED</b></p>
-            <button onclick="runFetch(50051)">Test Fetch</button>
+            <button onclick="runFetch(50051, '/')">Test Fetch (gRPC Root)</button>
             <p id="result-50051">Not started</p>
         </div>
         <div class="box">
             <h3>Port 8080 (PAC Server)</h3>
             <p>Expected: <b class="failure">BLOCKED</b></p>
-            <button onclick="runFetch(8080)">Test Fetch</button>
+            <button onclick="runFetch(8080, '/proxy.pac')">Test Fetch (/proxy.pac)</button>
             <p id="result-8080">Not started</p>
         </div>
         <div class="box">
             <h3>Port 5678 (LocalProxy)</h3>
             <p>Expected: <b class="failure">BLOCKED</b></p>
-            <button onclick="runFetch(5678)">Test Fetch</button>
+            <button onclick="runFetch(5678, '/')">Test Fetch (Socks/HTTP)</button>
             <p id="result-5678">Not started</p>
         </div>
         <div class="box">
             <h3>Port 3389 (xrdp)</h3>
             <p>Expected: <b class="failure">BLOCKED</b></p>
-            <button onclick="runFetch(3389)">Test Fetch</button>
+            <button onclick="runFetch(3389, '/')">Test Fetch (RDP Root)</button>
             <p id="result-3389">Not started</p>
         </div>
     </div>
@@ -69,31 +69,36 @@
                 document.getElementById('csp-display').textContent = 'Error reading headers: ' + e.message;
             }
         }
-        async function runFetch(port) {
+        async function runFetch(port, path) {
             const display = document.getElementById('result-' + port);
-            display.textContent = 'Testing...';
+            display.textContent = 'Testing ' + path + '...';
             display.className = '';
             try {
                 const controller = new AbortController();
-                setTimeout(() => controller.abort(), 1000);
-                await fetch('http://localhost:' + port + '/ping', { signal: controller.signal, mode: 'no-cors' });
-                display.textContent = 'SUCCESS (Reached network)';
-                display.className = 'success';
-            } catch (e) {
-                display.textContent = 'FAILED: ' + e.message;
+                setTimeout(() => controller.abort(), 2000);
+                await fetch('http://localhost:' + port + path, { signal: controller.signal, mode: 'no-cors' });
+                display.textContent = 'SUCCESS: Reached Origin (SECURITY VULNERABILITY!)';
                 display.className = 'failure';
+            } catch (e) {
+                if (e.message.includes('Content Security Policy') || e.name === 'SecurityError') {
+                    display.textContent = 'BLOCKED by CSP: ' + e.message;
+                    display.className = 'success';
+                } else {
+                    display.textContent = 'FAILED (Network/Protocol): ' + e.message;
+                    display.className = '';
+                }
             }
         }
-        async function runIframe(port) {
+        async function runIframe(port, path) {
             const container = document.getElementById('iframe-container');
             const display = document.getElementById('result-iframe-' + port);
             display.textContent = 'Testing Iframe...';
             display.className = '';
             return new Promise((resolve) => {
                 const iframe = document.createElement('iframe');
-                iframe.src = 'http://localhost:' + port + '/ping';
+                iframe.src = 'http://localhost:' + port + path;
                 iframe.onload = () => { display.textContent = 'Iframe LOADED'; display.className = 'success'; resolve(); };
-                iframe.onerror = () => { display.textContent = 'Iframe ERROR'; display.className = 'failure'; resolve(); };
+                iframe.onerror = () => { display.textContent = 'Iframe ERROR (Blocked)'; display.className = 'failure'; resolve(); };
                 container.innerHTML = '';
                 container.appendChild(iframe);
                 setTimeout(() => { if (display.textContent === 'Testing Iframe...') { display.textContent = 'Iframe TIMEOUT'; resolve(); } }, 2000);
@@ -101,8 +106,16 @@
         }
         getCSP();
         window.addEventListener('load', async () => {
-            for (const p of [1337, 9092, 50051, 8080, 5678, 3389]) await runFetch(p);
-            await runIframe(1337);
+            const probes = [
+                {p: 1337, path: '/ping'},
+                {p: 9092, path: '/metrics'},
+                {p: 50051, path: '/'},
+                {p: 8080, path: '/proxy.pac'},
+                {p: 5678, path: '/'},
+                {p: 3389, path: '/'}
+            ];
+            for (const probe of probes) await runFetch(probe.p, probe.path);
+            await runIframe(1337, '/ping');
             const d = document.createElement('div'); d.id = 'e2e-finished'; d.textContent = 'DONE'; document.body.appendChild(d);
         });
     </script>
