@@ -86,7 +86,11 @@
                     display.className = 'failure';
                 }
             } catch (e) {
-                const isCSPBlock = e.message.includes('Content Security Policy') || e.name === 'SecurityError';
+                // In Chromium, CSP blocks from the Network Service often manifest as a 
+                // generic TypeError: Failed to fetch for privacy.
+                const isCSPBlock = e.message.includes('Content Security Policy') || 
+                                 e.name === 'SecurityError' || 
+                                 e.message === 'Failed to fetch';
                 
                 if (isCSPBlock) {
                     if (expectAllowed) {
@@ -97,8 +101,7 @@
                         display.className = 'success';
                     }
                 } else {
-                    // This means CSP allowed it (the request left the browser), 
-                    // but the network connection failed.
+                    // This handles actual network timeouts or protocol errors.
                     if (expectAllowed) {
                         display.textContent = 'ALLOWED by CSP, but Network Error: ' + e.message;
                         display.className = 'success';
