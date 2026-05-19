@@ -2,19 +2,26 @@
 <html>
 <head>
     <title>CSP Security Test (Static)</title>
+    <!-- Force No Cache -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <style>
         body { font-family: sans-serif; padding: 20px; }
         .box { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; border-radius: 4px; }
         .success { color: green; font-weight: bold; }
         .failure { color: red; font-weight: bold; }
-        pre { background: #f4f4f4; padding: 10px; overflow-x: auto; }
-        .ports-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+        .warning { color: orange; font-weight: bold; }
+        pre { background: #f4f4f4; padding: 10px; overflow-x: auto; white-space: pre-wrap; }
+        .ports-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 10px; }
+        .timestamp { color: #666; font-size: 0.8em; }
     </style>
 </head>
 <body>
-    <h1>CSP Security Verification (Static)</h1>
+    <h1>CSP Security Verification (v2.1)</h1>
     <div class="box">
         <h3>Observed CSP Headers</h3>
+        <p class="timestamp">Headers fetched at: <span id="header-time">...</span></p>
         <pre id="csp-display">Fetching headers...</pre>
     </div>
     <h2>Localhost Service Reachability</h2>
@@ -36,7 +43,7 @@
         <div class="box">
             <h3>Port 50051 (EML gRPC)</h3>
             <p>Expected: <b class="failure">BLOCKED</b></p>
-            <button onclick="runFetch(50051, '/', false)">Test Fetch (gRPC Root)</button>
+            <button onclick="runFetch(50051, '/', false)">Test Fetch (Root)</button>
             <p id="result-50051">Not started</p>
         </div>
         <div class="box">
@@ -48,13 +55,13 @@
         <div class="box">
             <h3>Port 5678 (LocalProxy)</h3>
             <p>Expected: <b class="failure">BLOCKED</b></p>
-            <button onclick="runFetch(5678, '/', false)">Test Fetch (Socks/HTTP)</button>
+            <button onclick="runFetch(5678, '/', false)">Test Fetch (Root)</button>
             <p id="result-5678">Not started</p>
         </div>
         <div class="box">
             <h3>Port 3389 (xrdp)</h3>
             <p>Expected: <b class="failure">BLOCKED</b></p>
-            <button onclick="runFetch(3389, '/', false)">Test Fetch (RDP Root)</button>
+            <button onclick="runFetch(3389, '/', false)">Test Fetch (Root)</button>
             <p id="result-3389">Not started</p>
         </div>
     </div>
@@ -62,56 +69,69 @@
     <script>
         async function getCSP() {
             try {
-                const resp = await fetch(window.location.href);
+                // Add a cache-busting query parameter
+                const resp = await fetch(window.location.href + '?t=' + Date.now(), { cache: 'no-store' });
                 const csp = resp.headers.get('Content-Security-Policy');
-                document.getElementById('csp-display').textContent = csp || 'No CSP Header Found';
+                document.getElementById('header-time').textContent = new Date().toLocaleTimeString();
+                document.getElementById('csp-display').textContent = csp || 'CRITICAL: No CSP Header Found in fresh fetch!';
+                if (!csp) document.getElementById('csp-display').className = 'failure';
             } catch (e) {
                 document.getElementById('csp-display').textContent = 'Error reading headers: ' + e.message;
             }
         }
+
         async function runFetch(port, path, expectAllowed) {
             const display = document.getElementById('result-' + port);
-            display.textContent = 'Testing ' + path + '...';
+            display.textContent = 'Testing...';
             display.className = '';
+            
+            const start = performance.now();
             try {
                 const controller = new AbortController();
-                setTimeout(() => controller.abort(), 2000);
-                await fetch('http://localhost:' + port + path, { signal: controller.signal, mode: 'no-cors' });
+                // 3-second timeout to allow the browser to report CSP blocks.
+                // A CSP block usually happens in < 50ms.
+                const timeoutId = setTimeout(() => controller.abort(), 3000);
+                
+                await fetch('http://localhost:' + port + path, { 
+                    signal: controller.signal, 
+                    mode: 'no-cors',
+                    cache: 'no-store'
+                });
+                
+                clearTimeout(timeoutId);
+                const duration = Math.round(performance.now() - start);
                 
                 if (expectAllowed) {
-                    display.textContent = 'SUCCESS: Reached Origin (Correctly Allowed)';
+                    display.innerHTML = `<span class="success">SUCCESS</span>: Reached Origin in ${duration}ms (Correctly Allowed)`;
                     display.className = 'success';
                 } else {
-                    display.textContent = 'SUCCESS: Reached Origin (SECURITY VULNERABILITY!)';
+                    display.innerHTML = `<span class="failure">VULNERABILITY</span>: Reached Origin in ${duration}ms (CSP FAILED!)`;
                     display.className = 'failure';
                 }
             } catch (e) {
-                // In Chromium, CSP blocks from the Network Service often manifest as a 
-                // generic TypeError: Failed to fetch for privacy.
-                const isCSPBlock = e.message.includes('Content Security Policy') || 
-                                 e.name === 'SecurityError' || 
-                                 e.message === 'Failed to fetch';
+                const duration = Math.round(performance.now() - start);
+                const isAbort = e.name === 'AbortError';
+                const isTypeError = e instanceof TypeError;
+                const isCSPMessage = e.message.includes('Content Security Policy') || e.name === 'SecurityError';
                 
-                if (isCSPBlock) {
+                if (isAbort) {
+                    display.innerHTML = `<span class="failure">TIMEOUT (CSP BYPASS)</span>: Connection hung for ${duration}ms. Browser allowed the request; only firewall stopped it.`;
+                    display.className = 'failure';
+                } else if (isTypeError || isCSPMessage) {
                     if (expectAllowed) {
-                        display.textContent = 'BLOCKED by CSP (Incorrectly Restricted!)';
+                        display.innerHTML = `<span class="warning">BLOCKED</span> in ${duration}ms (Incorrectly Restricted)`;
                         display.className = 'failure';
                     } else {
-                        display.textContent = 'BLOCKED by CSP (Correctly Protected)';
+                        display.innerHTML = `<span class="success">BLOCKED</span> by CSP in ${duration}ms (Correctly Protected)`;
                         display.className = 'success';
                     }
                 } else {
-                    // This handles actual network timeouts or protocol errors.
-                    if (expectAllowed) {
-                        display.textContent = 'ALLOWED by CSP, but Network Error: ' + e.message;
-                        display.className = 'success';
-                    } else {
-                        display.textContent = 'REACHED via CSP, but Network Error (Vulnerable at Browser Level): ' + e.message;
-                        display.className = 'failure';
-                    }
+                    display.innerHTML = `<span class="failure">ERROR</span>: ${e.message} (${duration}ms)`;
+                    display.className = 'failure';
                 }
             }
         }
+
         async function runIframe(port, path) {
             const container = document.getElementById('iframe-container');
             const display = document.getElementById('result-iframe-' + port);
@@ -119,7 +139,7 @@
             display.className = '';
             return new Promise((resolve) => {
                 const iframe = document.createElement('iframe');
-                iframe.src = 'http://localhost:' + port + path;
+                iframe.src = 'http://localhost:' + port + path + '?t=' + Date.now();
                 iframe.onload = () => { display.textContent = 'Iframe LOADED'; display.className = 'success'; resolve(); };
                 iframe.onerror = () => { display.textContent = 'Iframe BLOCKED/ERROR'; display.className = 'success'; resolve(); };
                 container.innerHTML = '';
@@ -127,6 +147,7 @@
                 setTimeout(() => { if (display.textContent === 'Testing Iframe...') { display.textContent = 'Iframe TIMEOUT'; resolve(); } }, 2000);
             });
         }
+
         getCSP();
         window.addEventListener('load', async () => {
             const probes = [
