@@ -1,95 +1,89 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>CSP Security Test (Static)</title>
+    <title>Network Security Test (Layer 2 Verification)</title>
     <!-- Force No Cache -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <style>
-        body { font-family: sans-serif; padding: 20px; }
-        .box { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; border-radius: 4px; }
-        .success { color: green; font-weight: bold; }
-        .failure { color: red; font-weight: bold; }
-        .warning { color: orange; font-weight: bold; }
-        pre { background: #f4f4f4; padding: 10px; overflow-x: auto; white-space: pre-wrap; }
-        .ports-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 10px; }
-        .timestamp { color: #666; font-size: 0.8em; }
+        body { font-family: sans-serif; padding: 20px; line-height: 1.6; color: #333; }
+        .box { border: 1px solid #ccc; padding: 15px; margin-bottom: 15px; border-radius: 8px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .success { color: #28a745; font-weight: bold; }
+        .failure { color: #dc3545; font-weight: bold; }
+        .warning { color: #ffc107; font-weight: bold; }
+        pre { background: #f8f9fa; padding: 12px; overflow-x: auto; white-space: pre-wrap; border: 1px solid #e9ecef; border-radius: 4px; font-size: 0.9em; }
+        .ports-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 15px; }
+        .timestamp { color: #6c757d; font-size: 0.85em; margin-bottom: 10px; display: block; }
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; background: #17a2b8; color: white; }
+        button { cursor: pointer; padding: 6px 12px; border: 1px solid #007bff; background: #fff; color: #007bff; border-radius: 4px; transition: all 0.2s; }
+        button:hover { background: #007bff; color: #fff; }
+        h1 { margin-bottom: 25px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        h3 { margin-top: 0; color: #495057; }
     </style>
 </head>
 <body>
-    <h1>CSP Security Verification (v2.1)</h1>
+    <h1>Network Security Verification <span class="badge">Layer 2 Audit v3.0</span></h1>
+    
     <div class="box">
-        <h3>Observed CSP Headers</h3>
-        <p class="timestamp">Headers fetched at: <span id="header-time">...</span></p>
-        <pre id="csp-display">Fetching headers...</pre>
+        <h3>Security Model Status</h3>
+        <span class="timestamp">Audit performed at: <span id="header-time">...</span></span>
+        <p>Current Architecture: <b>Explicit Network Denial (Layer 2)</b></p>
+        <p><i>Note: This system no longer relies on Layer 1 CSP injection. All enforcement happens at the network interceptor level.</i></p>
     </div>
-    <h2>Localhost Service Reachability</h2>
+
+    <h2>Localhost Service Reachability Audit</h2>
+    <p><i>This audit verifies that the CBI Network Policy surgically allows 1337 while strictly blocking sensitive infrastructure ports via the Explicit Denial List.</i></p>
+    
     <div class="ports-grid">
         <div class="box">
             <h3>Port 1337 (Pdftron/RWC)</h3>
-            <p>Expected: <b class="success">ALLOWED</b></p>
-            <button onclick="runFetch(1337, '/ping', true)">Test Fetch</button>
-            <button onclick="runIframe(1337, '/ping')">Test Iframe</button>
+            <p>Policy Goal: <b class="success">ALLOWED</b></p>
+            <button onclick="runFetch(1337, '/ping', true)">Re-test Fetch</button>
             <p id="result-1337">Not started</p>
-            <p id="result-iframe-1337">Not started</p>
         </div>
         <div class="box">
             <h3>Port 9092 (Prometheus)</h3>
-            <p>Expected: <b class="failure">BLOCKED</b></p>
-            <button onclick="runFetch(9092, '/metrics', false)">Test Fetch (/metrics)</button>
+            <p>Policy Goal: <b class="failure">BLOCKED</b></p>
+            <button onclick="runFetch(9092, '/metrics', false)">Re-test Block</button>
             <p id="result-9092">Not started</p>
         </div>
         <div class="box">
             <h3>Port 50051 (EML gRPC)</h3>
-            <p>Expected: <b class="failure">BLOCKED</b></p>
-            <button onclick="runFetch(50051, '/', false)">Test Fetch (Root)</button>
+            <p>Policy Goal: <b class="failure">BLOCKED</b></p>
+            <button onclick="runFetch(50051, '/', false)">Re-test Block</button>
             <p id="result-50051">Not started</p>
         </div>
         <div class="box">
             <h3>Port 8080 (PAC Server)</h3>
-            <p>Expected: <b class="failure">BLOCKED</b></p>
-            <button onclick="runFetch(8080, '/proxy.pac', false)">Test Fetch (/proxy.pac)</button>
+            <p>Policy Goal: <b class="failure">BLOCKED</b></p>
+            <button onclick="runFetch(8080, '/proxy.pac', false)">Re-test Block</button>
             <p id="result-8080">Not started</p>
         </div>
         <div class="box">
             <h3>Port 5678 (LocalProxy)</h3>
-            <p>Expected: <b class="failure">BLOCKED</b></p>
-            <button onclick="runFetch(5678, '/', false)">Test Fetch (Root)</button>
+            <p>Policy Goal: <b class="failure">BLOCKED</b></p>
+            <button onclick="runFetch(5678, '/', false)">Re-test Block</button>
             <p id="result-5678">Not started</p>
         </div>
         <div class="box">
             <h3>Port 3389 (xrdp)</h3>
-            <p>Expected: <b class="failure">BLOCKED</b></p>
-            <button onclick="runFetch(3389, '/', false)">Test Fetch (Root)</button>
+            <p>Policy Goal: <b class="failure">BLOCKED</b></p>
+            <button onclick="runFetch(3389, '/', false)">Re-test Block</button>
             <p id="result-3389">Not started</p>
         </div>
     </div>
-    <div id="iframe-container" style="display:none;"></div>
-    <script>
-        async function getCSP() {
-            try {
-                // Add a cache-busting query parameter
-                const resp = await fetch(window.location.href + '?t=' + Date.now(), { cache: 'no-store' });
-                const csp = resp.headers.get('Content-Security-Policy');
-                document.getElementById('header-time').textContent = new Date().toLocaleTimeString();
-                document.getElementById('csp-display').textContent = csp || 'CRITICAL: No CSP Header Found in fresh fetch!';
-                if (!csp) document.getElementById('csp-display').className = 'failure';
-            } catch (e) {
-                document.getElementById('csp-display').textContent = 'Error reading headers: ' + e.message;
-            }
-        }
 
+    <script>
         async function runFetch(port, path, expectAllowed) {
+            document.getElementById('header-time').textContent = new Date().toLocaleTimeString();
             const display = document.getElementById('result-' + port);
-            display.textContent = 'Testing...';
+            display.textContent = 'Probing...';
             display.className = '';
             
             const start = performance.now();
             try {
                 const controller = new AbortController();
-                // 3-second timeout to allow the browser to report CSP blocks.
-                // A CSP block usually happens in < 50ms.
                 const timeoutId = setTimeout(() => controller.abort(), 3000);
                 
                 await fetch('http://localhost:' + port + path, { 
@@ -102,27 +96,22 @@
                 const duration = Math.round(performance.now() - start);
                 
                 if (expectAllowed) {
-                    display.innerHTML = `<span class="success">SUCCESS</span>: Reached Origin in ${duration}ms (Correctly Allowed)`;
+                    display.innerHTML = `<span class="success">SUCCESS</span>: Reached in ${duration}ms (Correct)`;
                     display.className = 'success';
                 } else {
-                    display.innerHTML = `<span class="failure">VULNERABILITY</span>: Reached Origin in ${duration}ms (CSP FAILED!)`;
+                    display.innerHTML = `<span class="failure">VULNERABILITY</span>: Reached in ${duration}ms (Network Denial FAILED!)`;
                     display.className = 'failure';
                 }
             } catch (e) {
                 const duration = Math.round(performance.now() - start);
-                const isAbort = e.name === 'AbortError';
-                const isTypeError = e instanceof TypeError;
-                const isCSPMessage = e.message.includes('Content Security Policy') || e.name === 'SecurityError';
+                const isTypeError = e instanceof TypeError; // net::ERR_BLOCKED_BY_CLIENT manifests as TypeError in fetch
                 
-                if (isAbort) {
-                    display.innerHTML = `<span class="failure">TIMEOUT (CSP BYPASS)</span>: Connection hung for ${duration}ms. Browser allowed the request; only firewall stopped it.`;
-                    display.className = 'failure';
-                } else if (isTypeError || isCSPMessage) {
+                if (isTypeError) {
                     if (expectAllowed) {
-                        display.innerHTML = `<span class="warning">BLOCKED</span> in ${duration}ms (Incorrectly Restricted)`;
+                        display.innerHTML = `<span class="failure">BLOCKED</span> in ${duration}ms (Incorrectly Restricted)`;
                         display.className = 'failure';
                     } else {
-                        display.innerHTML = `<span class="success">BLOCKED</span> by CSP in ${duration}ms (Correctly Protected)`;
+                        display.innerHTML = `<span class="success">BLOCKED</span> by Network Policy in ${duration}ms (Correct)`;
                         display.className = 'success';
                     }
                 } else {
@@ -132,23 +121,6 @@
             }
         }
 
-        async function runIframe(port, path) {
-            const container = document.getElementById('iframe-container');
-            const display = document.getElementById('result-iframe-' + port);
-            display.textContent = 'Testing Iframe...';
-            display.className = '';
-            return new Promise((resolve) => {
-                const iframe = document.createElement('iframe');
-                iframe.src = 'http://localhost:' + port + path + '?t=' + Date.now();
-                iframe.onload = () => { display.textContent = 'Iframe LOADED'; display.className = 'success'; resolve(); };
-                iframe.onerror = () => { display.textContent = 'Iframe BLOCKED/ERROR'; display.className = 'success'; resolve(); };
-                container.innerHTML = '';
-                container.appendChild(iframe);
-                setTimeout(() => { if (display.textContent === 'Testing Iframe...') { display.textContent = 'Iframe TIMEOUT'; resolve(); } }, 2000);
-            });
-        }
-
-        getCSP();
         window.addEventListener('load', async () => {
             const probes = [
                 {p: 1337, path: '/ping', allowed: true},
@@ -158,9 +130,15 @@
                 {p: 5678, path: '/', allowed: false},
                 {p: 3389, path: '/', allowed: false}
             ];
-            for (const probe of probes) await runFetch(probe.p, probe.path, probe.allowed);
-            await runIframe(1337, '/ping');
-            const d = document.createElement('div'); d.id = 'e2e-finished'; d.textContent = 'DONE'; document.body.appendChild(d);
+            for (const probe of probes) {
+                await runFetch(probe.p, probe.path, probe.allowed);
+            }
+            
+            // Mark for E2E automation
+            const d = document.createElement('div');
+            d.id = 'e2e-finished';
+            d.textContent = 'DONE';
+            document.body.appendChild(d);
         });
     </script>
 </body>
